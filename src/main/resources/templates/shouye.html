@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="target-densitydpi=286, width=640, user-scalable=no" />
+<title>闵行微警务</title>
+<link href="shga/css/css.css" rel="stylesheet" />
+<link href="shga/css/swiper-3.3.1.min.css" rel="stylesheet" />
+<script src="shga/js/jquery-1.7.2.min.js"></script>
+<script src="shga/js/swiper-3.3.1.jquery.min.js"></script>
+    <script src="https://webapi.amap.com/maps?v=1.4.4&key=ca34a7d15b980730f9d997a96c5a2d25&callback=init"></script>
+    <script src="js/jquery.cookie.js"></script>
+    <script>
+        var shuju;
+        function promise_map_scan() {
+            var p=new Promise(function (resolve,reject) {
+                $.cookie("ula_code","",{expires:-1,path:'/'});
+                $.cookie("phone","",{expires:-1,path:'/'});
+                $.cookie("type","",{expires:-1,path:'/'});
+                $.cookie("zrq","",{expires:-1,path:'/'});
+
+                var urlCode=window.location.search.substr(9);
+                var url="https://mhewm.police.sh.cn/ulax/code/scan?ulaCode="+urlCode;
+                $.cookie("dwcode",urlCode);
+                $.get(url,function (resp) {
+                    var data=eval("("+resp+")");
+                    var parm={};
+                    $.cookie("address",data["address"]);
+                    shuju=data;
+                    resolve(data);
+                });
+            });
+            return p;
+        }
+
+        function promise_map_zrq() {
+            var p=new Promise(function (resolve,reject) {
+                var data=shuju;
+                var parm={};
+                $.cookie("address",data["address"]);
+                parm["ulaCode"]=data["ula_code"];
+                parm["crs"]="gcj02";
+                $.post("https://mhewm.police.sh.cn/ulax/code/getZrq",parm,function (response) {
+                    var resp=eval("("+response+")");
+                    $.cookie("ula_code",resp["ula_code"]);
+                    resolve("zrq");
+                });
+
+            });
+            return p;
+        }
+
+        function promise_map_init() {
+            var p=new Promise(function (resolve,reject) {
+                var data=shuju;
+                if(!data.hasOwnProperty("type"))
+                {
+                    window.location.href="/message";
+                    return;
+                }
+                if(!data.hasOwnProperty("coordinate"))
+                {
+                    window.location.href="/message";
+                    return;
+                }
+                var url=data["ula_code"];
+                var map = new AMap.Map('head', {
+                    center: [data["coordinate"][0],data["coordinate"][1]],
+                    zoom: 17,
+                    zoomEnable:true,
+                    dragEnable: false
+                });
+                map.plugin(["AMap.ToolBar"], function() {
+                    map.addControl(new AMap.ToolBar());
+                });
+                var type=data["type"];
+                $.cookie("type",type);
+                //alert(type);
+                var img                                                                                                             ;
+                switch (type)
+                {
+                    case "shape_poi_gate":img="images/门址.svg";break;
+                    case "shape_poi_company":img="images/单位.svg";break;
+                    case "shape_poi_shexiangtantou":img="images/探头立杆.svg";break;
+                    case "shape_poi_shubaoting":img="images/书报亭.svg";break;
+                    case "shape_poi_cesuo":img="images/厕所.svg";break;
+                    case "shape_poi_jiayouzhan":img="images/加油站.svg";break;
+                    case "shape_poi_tingchechang":img="images/停车场.svg";break;
+                    case "shape_poi_lajitong":img="images/垃圾桶.svg";break;
+                    case "shape_poi_hydrant":img="images/消防栓.svg";break;
+                    case "shape_poi_xiaofangshuan":img="images/消防栓.svg";break;
+                    case "shape_poi_qiaoliang":img="images/桥梁.svg";break;
+                    case "shape_poi_gate":img="images/住宅.png";break;
+                    default:img="images/住宅.png";break;
+                }
+                var marker = new AMap.Marker({
+                    icon: new AMap.Icon({
+                        size:new AMap.Size(196,195),//图标大小
+                        image:img.toString(),
+                        imageSize: new AMap.Size(80,80),
+                    }),
+                    //这里用/img/loc.png图片的left:18;top:38指向坐标
+                    offset: new AMap.Pixel(-10,-23),
+                    position: [data["coordinate"][0],data["coordinate"][1]],
+                    draggable:false ,//点标记可拖拽
+
+                });
+                // var address=data["address"];
+                //var index=address.findIndex("上海市闵行区");//    ("上海市闵行区");
+                //address=address.substr(6);
+                marker.setMap(map);
+                var text = new AMap.Text({
+                    text:data["address"].substr(6,data["address"].length),
+                    textAlign:'center', // 'left' 'right', 'center',
+                    verticalAlign:'middle', //middle 、bottom
+                    style:{
+                        'background-color':'rgba(0,0,0,0)',
+                        'border':'solid 1px rgba(0,0,0,0)',
+                        'padding':'320px 150px',
+                        'color': '#0000FF'
+                    },
+                    offset: new AMap.Pixel(18, 50),
+                    position: [data["coordinate"][0],data["coordinate"][1]],
+                });
+                text.setMap(map);
+
+
+                resolve("map init");
+            });
+            return p;
+        }
+
+        function promise_init_paichusuo() {
+            var p = new Promise(function (resolve, reject) {
+                var parm = {};
+                parm["ulaCode"] = $.cookie('ula_code');
+                /* $.post("/initpaichusuo",parm,function (data)
+                {
+                    var response=eval("("+data+")");
+                    console.log(response);
+                    /!* if(response["respResult"]["total"]==0)
+                    {
+                    return;
+                    }*!/
+                    console.log(response);
+                    var zrq="数据未登记",phone="数据未登记",pcsjj="数据未登记",pcs="数据未登记";
+                    if(response["respResult"]["total"]!=0) {
+                        zrq = response["respResult"]["dataList"][0]["name"];
+                        phone = response["respResult"]["dataList"][0]["police_station_ph"];
+                        pcsjj = response["respResult"]["dataList"][0]["police_desc"];
+                        pcs=response["respResult"]["dataList"][0]["police_station"];
+                    }
+                    if(phone==""||phone==null||phone==undefined)
+                        phone='数据未登记';
+                    if(zrq==""==zrq==null||zrq==undefined)
+                        zrq="数据未登记";
+                    if(pcsjj==""||pcsjj==null||pcsjj==undefined)
+                        pcsjj="数据未登记";
+                    if(pcs==""||pcs==null||pcs==undefined)
+                        pcs="数据未登记";
+                    $.cookie("zrq",zrq);
+                    $("#tab2").append
+                    (
+                        '<li>'+
+                        '<div class="con4f2t mg2 xi25">'+pcs+'</div>'+
+                        '<div class="con4f2f mg2 xi22">'+
+                        '<div class="con4f2fl f">'+'派出所电话：'+'</div>'+
+                        '<div class="con4f2fr f">'+phone+'</div>'+
+                        '</div>'+
+                        '<div class="con4f2f mg2 xi22">'+
+                        '<div class="con4f2fl f">'+'责任区：'+'</div>'+
+                        '<div class="con4f2fr f">'+zrq+'</div>'+
+                        '</div>'+
+                        '<div class="con4f2f mg2 xi22">'+
+                        '<div class="con4f2fl f">'+'派出所简介：'+'</div>'+
+                        '<div class="con4f2fr f">'+pcsjj+'</div>'+
+                        '</div>'+
+                        '</li>'
+
+                    );
+                    console.log(data);
+                    resolve("2");
+                });*/
+                $.post("/new_pcs",parm,function (data)
+                {
+                    var response=eval("("+ data+")");
+                    console.log(response);
+                    for(var i=0;i<response["respResult"]["total"];i++){
+                        var pcsname=response["respResult"]["dataList"][i]["pcsname"];
+                        var pcssz=response["respResult"]["dataList"][i]["pcssz"] ;
+                        var pcsjdy=response["respResult"]["dataList"][i]["pcsjdy"];
+                        var pcsdh=response["respResult"]["dataList"][i]["pcsdh"];
+                        var pcsaddr= response["respResult"]["dataList"][i]["pcsaddr"];
+                        var pcsjj=response["respResult"]["dataList"][i]["pcsjj"];
+                        if(pcsname==null||pcsname==undefined||pcsname=="")
+                            pcsname="数据未登记";
+                        if(pcssz==null||pcssz==undefined||pcssz=="")
+                            pcssz="数据未登记";if(pcsjdy==null||pcsjdy==undefined||pcsjdy=="")
+                            pcsjdy="数据未登记";if(pcsdh==null||pcsdh==undefined||pcsdh=="")
+                            pcsdh="数据未登记";if(pcsaddr==null||pcsaddr==undefined||pcsaddr=="")
+                            pcsaddr="数据未登记";if(pcsjj==null||pcsjj==undefined||pcsjj=="")
+                            pcsnjj="数据未登记";
+
+                        $(" #content").append(
+                            '<li class="hover">'
+                            +
+                            '<div class="con8fl f">'+
+                            '<img src="shga/images/t14.png" style="width:138px;height:138px; border-radius:12px">'+
+                            '</div >'+
+                            '<div class=" con8fr f">'+
+                            '<div class="con8frt xi25">'+
+                            pcsname+
+                            '</div>'+
+                            '<div class="con8frf xi22">'+
+
+                            '派出所所长：'+ pcssz+'<br>'+
+                            '派出所教导员：'+pcsjdy+'<br>'+
+                            '派出所电话：'+pcsdh+'<br>'+
+                            '派出所地址：'+pcsaddr+'<br>'+
+                            '派出所简介：'+pcsjj+'<br>'+
+                            '<span>'+'点击关注公众号：'+
+                            '</span>'+'<a href="https://mp.weixin.qq.com/mp/profile_ext?action=home&__biz=MjM5MDE2MTkxMg==#wechat_redirect">'+'警民直通车闵行'+'</a>'+
+                            '</div>'+
+                            '</div>'+
+                            '</li>'
+                        );
+                    }
+                    resolve("2");
+                });
+                return p;
+            });
+            }
+        function promise_init_police() {
+            var p=new Promise(function (resolve,reject) {
+                var parm={};
+                $("#ul").html("");
+                parm["ulaCode"]=$.cookie('ula_code');
+                $.post("/init",parm,function (data) {
+                        var data1 = eval("(" + data + ")");
+                        console.log(data1);
+                        if (data1["total"] == 0) {
+                            $("#ul").html('数据未登记');
+                            return;
+                        }
+
+                        for(var i=0;i<data1["police_chief_length"];i++) {
+                            var url,photo=data1["dataList"][i],zrq;
+                            if(photo.hasOwnProperty("url"))
+                                url='sfz/' + data1["dataList"][i]["url"].substr(data1["dataList"][i]["url"].lastIndexOf('/') + 1);
+                            else
+                                url=undefined;
+                            /*   if(photo.hasOwnProperty("zzmc"))
+                                   zrq=data1["dataList"][i]["zzmc"];*/
+                            if($.cookie("zrq")!=null&&$.cookie("zrq")!=""&&$.cookie("zrq")!=undefined)
+                                zrq=$.cookie("zrq");
+                            else
+                                zrq="数据未登记";
+
+                            $("#ul").append(
+                                '<li>' +
+                                '<div class="con4fl f">' +
+                                '<img alt="照片未上传" src=' + url + '  style="width:138px; height:138px; border-radius:12px;">' +
+                                '</div>' +
+                                '<div class="con4fr f">' +
+                                '<div class="con4frt xi26">' + data1["dataList"][i]["xm"] + '</div>' +
+                                '<div class="con4frf xi22">' +
+                                '职务：警长' + '<br>' +
+                                '警号：' + data1["dataList"][i]["jh"] + '<br>' +
+                                '责任区：' + zrq +
+                                '</div>' +
+                                '</div>' +
+                                '</li>'
+                            );
+                        }
+                        for(var i=data1["police_chief_length"];i<data1["total"];i++) {
+                            var url=undefined,photo=data1["dataList"][i],zrq=undefined;
+                            if(photo.hasOwnProperty("url"))
+                                url='sfz/' + data1["dataList"][i]["url"].substr(data1["dataList"][i]["url"].lastIndexOf('/') + 1);
+                            else
+                                url=undefined;
+                            /* if(photo.hasOwnProperty("zzmc"))
+                                 zrq=data1["dataList"][i]["zzmc"];*/
+                            if($.cookie("zrq")!=null&&$.cookie("zrq")!=""&&$.cookie("zrq")!=undefined)
+                                zrq=$.cookie("zrq");
+                            else
+                                zrq="数据未登记";
+                            $("#ul").append(
+                                '<li>'+
+                                '<div class="con4fl f">'+
+                                '<img alt="照片未上传" src='+ url+' style="width:138px; height:138px; border-radius:12px;" >'+
+                                '</div>'+
+                                '<div class="con4fr f">'+
+                                '<div class="con4frt xi26">'+data1["dataList"][i]["xm"]+'</div>'+
+                                '<div class="con4frf xi22">'+
+                                '职务：警员'+'<br>'+
+                                '警号：'+data1["dataList"][i]["jh"]+'<br>'+
+                                '责任区：'+zrq+
+                                '</div>'+
+                                '</div>'+
+                                '</li>'
+                            );
+                        }
+                        resolve("3");
+                    }
+                );
+
+            });
+            return p;
+        }
+        function init() {
+            promise_map_scan().then(function (data) {
+                return new promise_map_zrq();
+            }).then(function (data) {
+                return new promise_map_init();
+            })
+                .then(
+                    function (data) {
+                        console.log(data);
+                        return promise_init_paichusuo();
+
+                    }
+                ).then(
+                function (data) {
+                    return promise_init_police();
+                }
+            );
+        }
+
+    </script>
+</head>
+
+<body style="background:#f9f9f9">
+<!--<div class="topt mgz"></div>-->
+<!--<div class="top mgz xi30 cen bai">
+    <img src="shga/images/logo.png" align='absmiddle' style="margin-top:-4px; margin-right:3px;">闵行微警务
+    <a href="#" class="topl"></a>
+    <a href="#" class="topr"></a>
+</div>
+-->
+<div class="con1 mgz" id="head" style="width: 100%; height:300px">
+<!--
+    <img src="shga/images/t3.png" style="width:100%">
+-->
+</div>
+<div class="con1 mgz" href="/listvideo">
+    <a href="https://shmh.police.sh.cn/listvideo"> <img src="shga/images/t12.png" style="width:100%"></a>a>
+</div>
+<div class="con8 mgz">
+    <div class="con8t mg2 xi27">
+        <img src="shga/images/t7.png" align='absmiddle' style="margin-top:-4px; margin-right:8px;">派出所
+    </div>
+    <div class="con8f mg2">
+        <ul id="content">
+          <!--  <li class="hover">
+                <div class="con8fl f">
+                    <img src="shga/images/t14.png" style="width:138px; height:138px; border-radius:12px">
+                </div>
+                <div class="con8fr f">
+                    <div class="con8frt xi25">
+                        北蔡派出所
+                    </div>
+                    <div class="con8frf xi22">
+                        派出所所长：温磊<br>
+派出所电话：021-58911514<br>
+派出所地址：上海市浦东新区莲园路225号<br>
+派出所简介：北蔡派出所区域面积约21.7平方
+公里，位于上海市浦东新区鹏春路100号，辖
+区为上海市浦东区，北蔡派出所归上海市公安
+局浦东分局管辖，现有民警76人。<br>
+<span>点击关注公众号：</span><a href="#">警民直通车闵行</a>
+                    </div>
+                </div>
+            </li>
+            <li>
+                <div class="con8fl f">
+                    <img src="shga/images/t14.png" style="width:138px; height:138px; border-radius:12px">
+                </div>
+                <div class="con8fr f">
+                    <div class="con8frt xi25">
+                        北蔡派出所
+                    </div>
+                    <div class="con8frf xi22">
+                        派出所所长：温磊<br>
+派出所电话：021-58911514<br>
+派出所地址：上海市浦东新区莲园路225号<br>
+派出所简介：北蔡派出所区域面积约21.7平方
+公里，位于上海市浦东新区鹏春路100号，辖
+区为上海市浦东区，北蔡派出所归上海市公安
+局浦东分局管辖，现有民警76人。<br>
+<span>点击关注公众号：</span><a href="#">警民直通车闵行</a>
+                    </div>
+                </div>
+            </li>-->
+        </ul>
+    </div>
+</div>
+<div class="footer mgz footers"> 
+    <ul>
+        <li class="lif1-hover">
+            <div id="one1" onclick="window.location.href='/lxwm'" >联系我们</div>
+        </li>
+        <li class="li2s">
+            <div id="one2" onclick="setTab('one',2,3)">信息上传</div>
+        </li>
+        <li class="li5s">
+            <div id="one3" onclick="setTab('one',3,3)">为民服务</div>
+        </li>
+    </ul>
+</div>
+<div class="footerf mgz"></div>
+<div class="xf" id="con_one_1" style="display:none" >
+    <!--<a href="#">内容</a>
+    <a href="#">内容</a>
+    <a href="#">内容</a>-->
+</div>
+<div class="xf2 xf2s" id="con_one_2" style="display:none">
+    <a href="/fwzlinfo">房屋租赁</a>
+    <a href="/cyinfoupload">单位从业</a>
+    <a href="/xfinfoupload">消防检查</a>
+    <a href="/zajc">治安检查</a>
+</div>
+<div class="xf3 xf3s" id="con_one_3" style="display:none">
+
+</div>
+<div class="xf4" id="con_one_4" style="display:none">
+ <!--   <a href="#">内容</a>
+    <a href="#">内容</a>
+    <a href="#">内容</a>-->
+</div>
+<script src="shga/js/mjs.js"></script>
+</body>
+</html>
